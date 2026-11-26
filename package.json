@@ -1,0 +1,10 @@
+{
+  "name": "aranyapulse-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:frontend": "npm --prefix frontend run build",
+    "dev:cf": "npx wrangler dev",
+    "deploy:cf": "npm --prefix frontend run build && npx wrangler deploy"
+  }
+}

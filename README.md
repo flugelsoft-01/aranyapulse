@@ -4,18 +4,28 @@
 **Proposal Document:** [`NESFIC-D-15-Proposal.md`](./NESFIC-D-15-Proposal.md)
 
 ## Architecture
-- **`backend/` (FastAPI + Python):**
-  - `models/biomass.py`: Chave et al. (2014) allometric + IPCC Tier-2/3 AGB, BGB, Carbon Stock, and $\text{CO}_2\text{e}$ estimation engine.
-  - `models/satellite_sim.py`: 24-month Sentinel-2 optical + Sentinel-1 C-band SAR fusion time-series generator (maintaining continuity during Assam's monsoon).
-  - `data/assam_plantations.geojson`: Sample Assam plantation polygons (Kaziranga Buffer, Rani Reserve, Nameri Corridor, Dibru-Saikhowa, Orang Fringe).
 - **`frontend/` (Next.js + TypeScript + Tailwind + Recharts):**
   - Interactive Assam Plantation GIS Explorer (`NDVI`, `AGB`, `Canopy Height`, `Mortality Alerts`).
   - 24-month SAR-Optical & Biomass/CO2e analytics charts.
   - Ground-Truthing Verification modal (recalibrates plot AGB & logs DFO audit trail).
   - One-click **Export MRV / Proof PDF** dossier generator.
+- **`worker/` (Cloudflare Worker Edge API + Static Assets):**
+  - Serves `frontend/out` via Cloudflare Workers Static Assets and handles `/api/*` endpoints at the edge for single-command deployment.
+- **`backend/` (FastAPI + Python):**
+  - Local/cloud Python backend (`models/biomass.py`, `models/satellite_sim.py`, `data/assam_plantations.geojson`) with `pytest` suite.
 
-## Quickstart
+## Cloudflare Workers Deployment (Single-Command Full-Stack)
+1. Authenticate with Cloudflare:
+   ```bash
+   npx wrangler login
+   ```
+2. Build static frontend (`frontend/out`) and deploy Worker + Static Assets:
+   ```bash
+   npm run deploy:cf
+   ```
+   *(Or test locally with `npm run build:frontend && npm run dev:cf`.)*
 
+## Local Development (Python FastAPI + Next.js)
 ### 1. Run Backend (Port 8000)
 ```bash
 cd backend
@@ -27,5 +37,4 @@ cd backend
 cd frontend
 npm run dev
 ```
-
-Open `http://localhost:3000` in your browser. Click **Export MRV / Proof PDF** -> **Print / Save as PDF** to generate the Proof-of-Work PDF for NESFIC Section 03.
+*(Ensure `frontend/.env.local` sets `NEXT_PUBLIC_API_URL=http://localhost:8000`.)*

@@ -25,7 +25,9 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined" && window.location.port === "3000" ? "http://localhost:8000" : "");
 
 export default function HomePage() {
   const [features, setFeatures] = useState<PlantationFeature[]>([]);
