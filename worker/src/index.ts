@@ -96,16 +96,74 @@ const FIELD_LOGS: FieldLog[] = [
   },
 ];
 
-function inferWoodDensity(species: string): number {
+const ADMIN_USERS = [
+  { user_id: "USR-01", name: "Dr. M. Hazarika", role: "State Admin", scope: "All Assam Divisions (ASSAC)", active: true },
+  { user_id: "USR-02", name: "S. Baruah, IFS", role: "DFO", scope: "Eastern Assam Wildlife Division", active: true },
+  { user_id: "USR-03", name: "P. Das", role: "RFO", scope: "Sonitpur West Division", active: true },
+  { user_id: "USR-04", name: "R. Bora", role: "Beat Officer", scope: "Kaziranga Buffer Range", active: true },
+  { user_id: "USR-05", name: "A. Nair (FSI/Verra)", role: "External Auditor", scope: "Read-Only Carbon MRV", active: true },
+];
+
+const SPECIES_REGISTRY = [
+  { key: "sal", label: "Sal & Teak Mix (Shorea robusta)", wood_density: 0.72, root_to_shoot: 0.26 },
+  { key: "teak", label: "Teak Plantation (Tectona grandis)", wood_density: 0.6, root_to_shoot: 0.25 },
+  { key: "bamboo", label: "Riparian Bamboo & Kadam", wood_density: 0.55, root_to_shoot: 0.28 },
+  { key: "bonsum", label: "Bonsum & Gamari (Phoebe goalparensis)", wood_density: 0.52, root_to_shoot: 0.26 },
+  { key: "mixed", label: "Mixed Native (Simul, Ajhar, Hollong)", wood_density: 0.58, root_to_shoot: 0.26 },
+];
+
+const ADMIN_SETTINGS = {
+  min_survival_pct: 70.0,
+  ndvi_alert_threshold: 0.6,
+  sensitive_zone_masking: false,
+  last_eo_refresh: "2026-11-26T06:00:00Z",
+  model_version: "Chave-2014-IPCC-v2.1",
+};
+
+const AUDIT_TRAIL = [
+  {
+    audit_id: "AUD-001",
+    timestamp: "2026-11-26T06:00:00Z",
+    actor: "System EO Pipeline",
+    role: "State Admin",
+    action: "Sentinel-1/2 SAR-Optical Composite Refresh",
+    target: "All 5 Assam Plantation Blocks",
+  },
+  {
+    audit_id: "AUD-002",
+    timestamp: "2026-11-12T10:05:00Z",
+    actor: "S. Baruah, IFS",
+    role: "DFO",
+    action: "Approved Ground-Truth Verification",
+    target: "LOG-2026-001 (ASM-KZ-01)",
+  },
+];
+
+function logAudit(actor: string, role: string, action: string, target: string) {
+  AUDIT_TRAIL.unshift({
+    audit_id: `AUD-${crypto.randomUUID().slice(0, 5).toUpperCase()}`,
+    timestamp: new Date().toISOString(),
+    actor,
+    role,
+    action,
+    target,
+  });
+}
+
+function lookupSpeciesParams(species: string): { rho: number; rts: number } {
   const s = species.toLowerCase();
-  for (const [key, rho] of Object.entries(SPECIES_WOOD_DENSITY)) {
-    if (s.includes(key)) return rho;
+  for (const sp of SPECIES_REGISTRY) {
+    if (s.includes(sp.key)) return { rho: sp.wood_density, rts: sp.root_to_shoot };
   }
-  return 0.58;
+  return { rho: 0.58, rts: 0.26 };
+}
+
+function inferWoodDensity(species: string): number {
+  return lookupSpeciesParams(species).rho;
 }
 
 function estimateBiomass(p: PlantationProps, fieldCalibrated: boolean) {
-  const rho = inferWoodDensity(p.species);
+  const { rho, rts } = lookupSpeciesParams(p.species);
   const liveStems = Math.max(1, p.target_stems_per_ha * (p.survival_rate / 100));
   const dbh = Math.max(1.5, p.mean_dbh_cm);
   const height = Math.max(0.8, p.mean_height_m);
@@ -114,7 +172,7 @@ function estimateBiomass(p: PlantationProps, fieldCalibrated: boolean) {
   const allometricAgb = (agbPerTreeKg * liveStems) / 1000;
   const spectralFactor = 0.85 + 0.3 * Math.max(0, Math.min(1, p.base_ndvi));
   const agb = allometricAgb * (0.85 + 0.15 * spectralFactor);
-  const bgb = agb * 0.26;
+  const bgb = agb * rts;
   const totalBiomass = agb + bgb;
   const carbon = totalBiomass * 0.47;
   const co2e = carbon * (44 / 12);
@@ -345,6 +403,97 @@ export default {
           "Chave et al. (2014) Allometric + IPCC Tier-2/3 (0.47 C, 0.26 Root-to-Shoot) + Sentinel-1/2 SAR-Optical Fusion",
         plantations: enriched,
       });
+    }
+
+    if (path === "/api/admin/users" && request.method === "GET") {
+      return jsonResponse(ADMIN_USERS);
+    }
+
+    if (path === "/api/admin/users" && request.method === "POST") {
+      const payload = (await request.json()) as { name: string; role: string; scope: string };
+      const user = {
+        user_id: `USR-${String(ADMIN_USERS.length + 1).padStart(2, "0")}`,
+        name: payload.name,
+        role: payload.role,
+        scope: payload.scope,
+        active: true,
+      };
+      ADMIN_USERS.push(user);
+      logAudit("State Admin", "State Admin", `Provisioned ${payload.role} Account`, `${payload.name} (${payload.scope})`);
+      return jsonResponse(user);
+    }
+
+    if (path === "/api/admin/species" && request.method === "GET") {
+      return jsonResponse(SPECIES_REGISTRY);
+    }
+
+    if (path === "/api/admin/species" && request.method === "POST") {
+      const payload = (await request.json()) as { key: string; label: string; wood_density: number; root_to_shoot: number };
+      const keyLower = payload.key.toLowerCase().trim();
+      const existing = SPECIES_REGISTRY.find((s) => s.key === keyLower);
+      if (existing) {
+        existing.label = payload.label;
+        existing.wood_density = Math.round(payload.wood_density * 1000) / 1000;
+        existing.root_to_shoot = Math.round(payload.root_to_shoot * 1000) / 1000;
+        logAudit("State Admin", "State Admin", "Updated Allometric Species Table", `${existing.key} (rho=${existing.wood_density})`);
+        return jsonResponse(existing);
+      }
+      const entry = {
+        key: keyLower,
+        label: payload.label,
+        wood_density: Math.round(payload.wood_density * 1000) / 1000,
+        root_to_shoot: Math.round(payload.root_to_shoot * 1000) / 1000,
+      };
+      SPECIES_REGISTRY.push(entry);
+      logAudit("State Admin", "State Admin", "Updated Allometric Species Table", `${entry.key} (rho=${entry.wood_density})`);
+      return jsonResponse(entry);
+    }
+
+    if (path === "/api/admin/settings" && request.method === "GET") {
+      return jsonResponse(ADMIN_SETTINGS);
+    }
+
+    if (path === "/api/admin/settings" && request.method === "POST") {
+      const payload = (await request.json()) as {
+        min_survival_pct: number;
+        ndvi_alert_threshold: number;
+        sensitive_zone_masking: boolean;
+      };
+      ADMIN_SETTINGS.min_survival_pct = Math.round(payload.min_survival_pct * 10) / 10;
+      ADMIN_SETTINGS.ndvi_alert_threshold = Math.round(payload.ndvi_alert_threshold * 100) / 100;
+      ADMIN_SETTINGS.sensitive_zone_masking = payload.sensitive_zone_masking;
+      logAudit(
+        "State Admin",
+        "State Admin",
+        "Updated Alert & Compliance Settings",
+        `Surv>=${ADMIN_SETTINGS.min_survival_pct}%, NDVI>=${ADMIN_SETTINGS.ndvi_alert_threshold}, Masking=${ADMIN_SETTINGS.sensitive_zone_masking}`
+      );
+      return jsonResponse(ADMIN_SETTINGS);
+    }
+
+    if (path === "/api/admin/refresh-eo" && request.method === "POST") {
+      const now = new Date().toISOString();
+      ADMIN_SETTINGS.last_eo_refresh = now;
+      logAudit("GIS Admin", "State Admin", "Triggered Sentinel-1/2 EO Refresh", `${PLANTATIONS.length} polygons re-indexed`);
+      return jsonResponse({ status: "refreshed", last_eo_refresh: now });
+    }
+
+    if (path === "/api/admin/field-logs/approve-all" && request.method === "POST") {
+      let count = 0;
+      for (const l of FIELD_LOGS) {
+        if (!l.dfo_approved) {
+          l.dfo_approved = true;
+          count++;
+        }
+      }
+      if (count > 0) {
+        logAudit("DFO Reviewer", "DFO", "Batch Approved Pending Field Logs", `${count} verification log(s)`);
+      }
+      return jsonResponse({ approved_count: count });
+    }
+
+    if (path === "/api/admin/audit-logs" && request.method === "GET") {
+      return jsonResponse(AUDIT_TRAIL);
     }
 
     return env.ASSETS.fetch(request);

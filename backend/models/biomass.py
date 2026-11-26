@@ -43,13 +43,15 @@ def estimate_biomass_and_carbon(
     species: str = "Mixed Native",
     ndvi: float = 0.70,
     field_calibrated: bool = False,
+    wood_density_override: float | None = None,
+    root_to_shoot_ratio: float = 0.26,
 ) -> BiomassEstimate:
     """
     Estimate Above-Ground Biomass (AGB), Below-Ground Biomass (BGB),
     Carbon Stock, and CO2-equivalent using Chave et al. (2014) pantropical
     allometric equation blended with satellite NDVI structural prior.
     """
-    rho = _infer_wood_density(species)
+    rho = wood_density_override if wood_density_override is not None else _infer_wood_density(species)
     live_stems_per_ha = max(1.0, target_stems_per_ha * (survival_rate_pct / 100.0))
 
     # Chave et al. (2014) pantropical AGB per tree (kg): 0.0673 * (rho * D^2 * H)^0.976
@@ -63,7 +65,7 @@ def estimate_biomass_and_carbon(
     agb_t_ha = allometric_agb_t_ha * (0.85 + 0.15 * spectral_factor)
 
     # IPCC default root-to-shoot ratio for tropical/subtropical moist forests (~0.26)
-    bgb_t_ha = agb_t_ha * 0.26
+    bgb_t_ha = agb_t_ha * root_to_shoot_ratio
     total_biomass_t_ha = agb_t_ha + bgb_t_ha
 
     # IPCC carbon fraction = 0.47; CO2e = Carbon * (44/12)

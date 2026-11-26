@@ -51,3 +51,29 @@ def test_field_log_calibration_and_approval():
     app_res = client.post(f"/api/field-logs/{log_id}/approve")
     assert app_res.status_code == 200
     assert app_res.json()["dfo_approved"] is True
+
+
+def test_admin_endpoints():
+    users = client.get("/api/admin/users").json()
+    assert len(users) >= 5
+
+    sp_res = client.post(
+        "/api/admin/species",
+        json={"key": "hollong", "label": "Hollong", "wood_density": 0.65, "root_to_shoot": 0.26},
+    )
+    assert sp_res.status_code == 200
+    assert sp_res.json()["wood_density"] == 0.65
+
+    cfg_res = client.post(
+        "/api/admin/settings",
+        json={"min_survival_pct": 75.0, "ndvi_alert_threshold": 0.65, "sensitive_zone_masking": True},
+    )
+    assert cfg_res.status_code == 200
+    assert cfg_res.json()["sensitive_zone_masking"] is True
+
+    eo_res = client.post("/api/admin/refresh-eo")
+    assert eo_res.status_code == 200
+    assert eo_res.json()["status"] == "refreshed"
+
+    audit = client.get("/api/admin/audit-logs").json()
+    assert len(audit) >= 3

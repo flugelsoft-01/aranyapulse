@@ -68,6 +68,68 @@ FIELD_LOGS: List[Dict[str, Any]] = [
     },
 ]
 
+ADMIN_USERS: List[Dict[str, Any]] = [
+    {"user_id": "USR-01", "name": "Dr. M. Hazarika", "role": "State Admin", "scope": "All Assam Divisions (ASSAC)", "active": True},
+    {"user_id": "USR-02", "name": "S. Baruah, IFS", "role": "DFO", "scope": "Eastern Assam Wildlife Division", "active": True},
+    {"user_id": "USR-03", "name": "P. Das", "role": "RFO", "scope": "Sonitpur West Division", "active": True},
+    {"user_id": "USR-04", "name": "R. Bora", "role": "Beat Officer", "scope": "Kaziranga Buffer Range", "active": True},
+    {"user_id": "USR-05", "name": "A. Nair (FSI/Verra)", "role": "External Auditor", "scope": "Read-Only Carbon MRV", "active": True},
+]
+
+SPECIES_REGISTRY: List[Dict[str, Any]] = [
+    {"key": "sal", "label": "Sal & Teak Mix (Shorea robusta)", "wood_density": 0.72, "root_to_shoot": 0.26},
+    {"key": "teak", "label": "Teak Plantation (Tectona grandis)", "wood_density": 0.60, "root_to_shoot": 0.25},
+    {"key": "bamboo", "label": "Riparian Bamboo & Kadam", "wood_density": 0.55, "root_to_shoot": 0.28},
+    {"key": "bonsum", "label": "Bonsum & Gamari (Phoebe goalparensis)", "wood_density": 0.52, "root_to_shoot": 0.26},
+    {"key": "mixed", "label": "Mixed Native (Simul, Ajhar, Hollong)", "wood_density": 0.58, "root_to_shoot": 0.26},
+]
+
+ADMIN_SETTINGS: Dict[str, Any] = {
+    "min_survival_pct": 70.0,
+    "ndvi_alert_threshold": 0.60,
+    "sensitive_zone_masking": False,
+    "last_eo_refresh": "2026-11-26T06:00:00Z",
+    "model_version": "Chave-2014-IPCC-v2.1",
+}
+
+AUDIT_TRAIL: List[Dict[str, Any]] = [
+    {
+        "audit_id": "AUD-001",
+        "timestamp": "2026-11-26T06:00:00Z",
+        "actor": "System EO Pipeline",
+        "role": "State Admin",
+        "action": "Sentinel-1/2 SAR-Optical Composite Refresh",
+        "target": "All 5 Assam Plantation Blocks",
+    },
+    {
+        "audit_id": "AUD-002",
+        "timestamp": "2026-11-12T10:05:00Z",
+        "actor": "S. Baruah, IFS",
+        "role": "DFO",
+        "action": "Approved Ground-Truth Verification",
+        "target": "LOG-2026-001 (ASM-KZ-01)",
+    },
+]
+
+
+def _log_audit(actor: str, role: str, action: str, target: str) -> None:
+    AUDIT_TRAIL.insert(0, {
+        "audit_id": f"AUD-{uuid.uuid4().hex[:5].upper()}",
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "actor": actor,
+        "role": role,
+        "action": action,
+        "target": target,
+    })
+
+
+def _lookup_species_params(species: str) -> tuple[float | None, float]:
+    s = species.lower()
+    for sp in SPECIES_REGISTRY:
+        if sp["key"] in s:
+            return float(sp["wood_density"]), float(sp["root_to_shoot"])
+    return None, 0.26
+
 
 class FieldLogCreate(BaseModel):
     plantation_id: str
@@ -96,6 +158,7 @@ class PlantationUpload(BaseModel):
 def _enrich_feature(feature: Dict[str, Any]) -> Dict[str, Any]:
     props = dict(feature["properties"])
     calibrated = any(l["plantation_id"] == props["id"] for l in FIELD_LOGS)
+    rho_override, rts = _lookup_species_params(props["species"])
     est = estimate_biomass_and_carbon(
         area_ha=props["area_ha"],
         target_stems_per_ha=props["target_stems_per_ha"],
@@ -105,6 +168,8 @@ def _enrich_feature(feature: Dict[str, Any]) -> Dict[str, Any]:
         species=props["species"],
         ndvi=props["base_ndvi"],
         field_calibrated=calibrated,
+        wood_density_override=rho_override,
+        root_to_shoot_ratio=rts,
     )
     props.update({
         "agb_t_ha": est.agb_tonnes_per_ha,
@@ -187,16 +252,18 @@ def get_plantation_timeseries(plantation_id: str) -> Dict[str, Any]:
 @app.get("/api/alerts")
 def get_alerts() -> List[Dict[str, Any]]:
     alerts = []
+    min_surv = float(ADMIN_SETTINGS["min_survival_pct"])
+    min_ndvi = float(ADMIN_SETTINGS["ndvi_alert_threshold"])
     for f in PLANTATIONS:
         p = f["properties"]
-        if "Alert" in p["status"] or p["survival_rate"] < 70.0:
+        if "Alert" in p["status"] or p["survival_rate"] < min_surv or p["base_ndvi"] < min_ndvi:
             alerts.append({
                 "id": f"ALT-{p['id']}",
                 "plantation_id": p["id"],
                 "plantation_name": p["name"],
                 "division": p["division"],
-                "severity": "High" if p["survival_rate"] < 60.0 else "Medium",
-                "reason": p["status"],
+                "severity": "High" if p["survival_rate"] < (min_surv - 10.0) else "Medium",
+                "reason": p["status"] if "Alert" in p["status"] else f"Below threshold ({min_surv}% surv / {min_ndvi} NDVI)",
                 "survival_rate": p["survival_rate"],
                 "ndvi": p["base_ndvi"],
                 "recommended_action": "Dispatch Beat Officer for gap-filling assessment & plot verification.",
@@ -247,6 +314,7 @@ def approve_field_log(log_id: str) -> Dict[str, Any]:
     if not log:
         raise HTTPException(status_code=404, detail="Field log not found")
     log["dfo_approved"] = True
+    _log_audit("DFO Reviewer", "DFO", "Approved Ground-Truth Verification", f"{log_id} ({log['plantation_id']})")
     return log
 
 
@@ -269,3 +337,111 @@ def mrv_summary() -> Dict[str, Any]:
         "methodology": "Chave et al. (2014) Allometric + IPCC Tier-2/3 (0.47 C, 0.26 Root-to-Shoot) + Sentinel-1/2 SAR-Optical Fusion",
         "plantations": enriched,
     }
+
+
+class AdminUserCreate(BaseModel):
+    name: str = Field(..., min_length=2)
+    role: str
+    scope: str
+
+
+class SpeciesUpsert(BaseModel):
+    key: str = Field(..., min_length=2)
+    label: str = Field(..., min_length=2)
+    wood_density: float = Field(..., gt=0.1, le=1.5)
+    root_to_shoot: float = Field(..., gt=0.05, le=0.8)
+
+
+class AdminSettingsUpdate(BaseModel):
+    min_survival_pct: float = Field(..., ge=10, le=100)
+    ndvi_alert_threshold: float = Field(..., ge=0.1, le=0.95)
+    sensitive_zone_masking: bool
+
+
+@app.get("/api/admin/users")
+def list_admin_users() -> List[Dict[str, Any]]:
+    return ADMIN_USERS
+
+
+@app.post("/api/admin/users")
+def add_admin_user(payload: AdminUserCreate) -> Dict[str, Any]:
+    user = {
+        "user_id": f"USR-{len(ADMIN_USERS) + 1:02d}",
+        "name": payload.name,
+        "role": payload.role,
+        "scope": payload.scope,
+        "active": True,
+    }
+    ADMIN_USERS.append(user)
+    _log_audit("State Admin", "State Admin", f"Provisioned {payload.role} Account", f"{payload.name} ({payload.scope})")
+    return user
+
+
+@app.get("/api/admin/species")
+def list_species() -> List[Dict[str, Any]]:
+    return SPECIES_REGISTRY
+
+
+@app.post("/api/admin/species")
+def upsert_species(payload: SpeciesUpsert) -> Dict[str, Any]:
+    key_lower = payload.key.lower().strip()
+    existing = next((s for s in SPECIES_REGISTRY if s["key"] == key_lower), None)
+    if existing:
+        existing["label"] = payload.label
+        existing["wood_density"] = round(payload.wood_density, 3)
+        existing["root_to_shoot"] = round(payload.root_to_shoot, 3)
+        entry = existing
+    else:
+        entry = {
+            "key": key_lower,
+            "label": payload.label,
+            "wood_density": round(payload.wood_density, 3),
+            "root_to_shoot": round(payload.root_to_shoot, 3),
+        }
+        SPECIES_REGISTRY.append(entry)
+    _log_audit("State Admin", "State Admin", "Updated Allometric Species Table", f"{entry['key']} (rho={entry['wood_density']})")
+    return entry
+
+
+@app.get("/api/admin/settings")
+def get_admin_settings() -> Dict[str, Any]:
+    return ADMIN_SETTINGS
+
+
+@app.post("/api/admin/settings")
+def update_admin_settings(payload: AdminSettingsUpdate) -> Dict[str, Any]:
+    ADMIN_SETTINGS["min_survival_pct"] = round(payload.min_survival_pct, 1)
+    ADMIN_SETTINGS["ndvi_alert_threshold"] = round(payload.ndvi_alert_threshold, 2)
+    ADMIN_SETTINGS["sensitive_zone_masking"] = payload.sensitive_zone_masking
+    _log_audit(
+        "State Admin",
+        "State Admin",
+        "Updated Alert & Compliance Settings",
+        f"Surv>={payload.min_survival_pct}%, NDVI>={payload.ndvi_alert_threshold}, Masking={payload.sensitive_zone_masking}",
+    )
+    return ADMIN_SETTINGS
+
+
+@app.post("/api/admin/refresh-eo")
+def trigger_eo_refresh() -> Dict[str, Any]:
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ADMIN_SETTINGS["last_eo_refresh"] = now
+    _log_audit("GIS Admin", "State Admin", "Triggered Sentinel-1/2 EO Refresh", f"{len(PLANTATIONS)} polygons re-indexed")
+    return {"status": "refreshed", "last_eo_refresh": now}
+
+
+@app.post("/api/admin/field-logs/approve-all")
+def approve_all_field_logs() -> Dict[str, Any]:
+    count = 0
+    for log in FIELD_LOGS:
+        if not log["dfo_approved"]:
+            log["dfo_approved"] = True
+            count += 1
+    if count > 0:
+        _log_audit("DFO Reviewer", "DFO", "Batch Approved Pending Field Logs", f"{count} verification log(s)")
+    return {"approved_count": count}
+
+
+@app.get("/api/admin/audit-logs")
+def get_audit_logs() -> List[Dict[str, Any]]:
+    return AUDIT_TRAIL

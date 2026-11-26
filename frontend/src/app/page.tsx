@@ -8,11 +8,13 @@ import {
   MrvSummary,
   PlantationFeature,
   TimeSeriesPoint,
+  UserRole,
 } from "@/lib/types";
 import MapExplorer from "@/components/MapExplorer";
 import BiomassCharts from "@/components/BiomassCharts";
 import FieldVerifyModal from "@/components/FieldVerifyModal";
 import MrvReportModal from "@/components/MrvReportModal";
+import AdminConsole from "@/components/AdminConsole";
 import {
   Trees,
   Leaf,
@@ -23,6 +25,8 @@ import {
   MapPin,
   Plus,
   RefreshCw,
+  Settings,
+  LayoutDashboard,
 } from "lucide-react";
 
 const API_BASE =
@@ -41,6 +45,8 @@ export default function HomePage() {
   const [mrvSummary, setMrvSummary] = useState<MrvSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "admin">("dashboard");
+  const [activeRole, setActiveRole] = useState<UserRole>("State Admin");
 
   const fetchAll = useCallback(async () => {
     try {
@@ -177,7 +183,47 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-lg border border-[#1e3328] bg-[#101b15] p-0.5">
+              <button
+                type="button"
+                onClick={() => setActiveTab("dashboard")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer ${
+                  activeTab === "dashboard"
+                    ? "bg-emerald-500 text-slate-950 font-bold"
+                    : "text-emerald-200/80 hover:text-emerald-50"
+                }`}
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("admin")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer ${
+                  activeTab === "admin"
+                    ? "bg-emerald-500 text-slate-950 font-bold"
+                    : "text-emerald-200/80 hover:text-emerald-50"
+                }`}
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Admin Console
+              </button>
+            </div>
+
+            <select
+              aria-label="Active user role"
+              value={activeRole}
+              onChange={(e) => setActiveRole(e.target.value as UserRole)}
+              className="rounded-lg border border-[#1e3328] bg-[#101b15] px-2.5 py-1.5 text-xs text-emerald-200"
+            >
+              <option value="State Admin">Role: State Admin</option>
+              <option value="DFO">Role: DFO</option>
+              <option value="RFO">Role: RFO</option>
+              <option value="Beat Officer">Role: Beat Officer</option>
+              <option value="External Auditor">Role: External Auditor</option>
+            </select>
+
             <button
               type="button"
               onClick={handleAddSamplePlot}
@@ -214,8 +260,17 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Top KPI Strip */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {activeTab === "admin" ? (
+          <AdminConsole
+            apiBase={API_BASE}
+            activeRole={activeRole}
+            fieldLogs={fieldLogs}
+            onDataChanged={fetchAll}
+          />
+        ) : (
+          <>
+            {/* Top KPI Strip */}
+            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="rounded-xl border border-[#1e3328] bg-[#101b15] p-4">
             <p className="text-xs text-emerald-200/70">Total Monitored Area</p>
             <p className="text-2xl font-bold text-emerald-50 mt-1">
@@ -469,6 +524,8 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+          </>
+        )}
       </main>
 
       <FieldVerifyModal

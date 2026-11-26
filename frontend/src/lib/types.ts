@@ -86,3 +86,37 @@ export interface MrvSummary {
 }
 
 export type MapLayerMode = "ndvi" | "agb" | "chm" | "alerts";
+
+export type UserRole = "State Admin" | "DFO" | "RFO" | "Beat Officer" | "External Auditor";
+
+export interface AdminUser {
+  user_id: string;
+  name: string;
+  role: UserRole;
+  scope: string;
+  active: boolean;
+}
+
+export interface SpeciesEntry {
+  key: string;
+  label: string;
+  wood_density: number;
+  root_to_shoot: number;
+}
+
+export interface AdminSettings {
+  min_survival_pct: number;
+  ndvi_alert_threshold: number;
+  sensitive_zone_masking: boolean;
+  last_eo_refresh: string;
+  model_version: string;
+}
+
+export interface AuditLogEntry {
+  audit_id: string;
+  timestamp: string;
+  actor: string;
+  role: string;
+  action: string;
+  target: string;
+}
