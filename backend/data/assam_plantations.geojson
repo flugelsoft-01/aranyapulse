@@ -1,0 +1,120 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "ASM-KZ-01",
+        "name": "Kaziranga Buffer Block A",
+        "division": "Eastern Assam Wildlife Division",
+        "district": "Golaghat",
+        "species": "Mixed Native (Simul, Ajhar, Hollong)",
+        "plantation_year": 2022,
+        "area_ha": 48.5,
+        "target_stems_per_ha": 1100,
+        "terrain": "Alluvial Floodplain",
+        "base_ndvi": 0.74,
+        "survival_rate": 84.2,
+        "mean_dbh_cm": 11.4,
+        "mean_height_m": 6.8,
+        "status": "Healthy"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[93.361, 26.642], [93.371, 26.642], [93.371, 26.649], [93.361, 26.649], [93.361, 26.642]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "ASM-RN-02",
+        "name": "Rani Reserve Compensatory Plot",
+        "division": "Kamrup East Division",
+        "district": "Kamrup Metropolitan",
+        "species": "Sal & Teak Mix (Shorea robusta)",
+        "plantation_year": 2021,
+        "area_ha": 62.0,
+        "target_stems_per_ha": 1000,
+        "terrain": "Undulating Foothills",
+        "base_ndvi": 0.79,
+        "survival_rate": 88.5,
+        "mean_dbh_cm": 14.2,
+        "mean_height_m": 8.9,
+        "status": "Healthy"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[91.592, 26.021], [91.604, 26.021], [91.604, 26.029], [91.592, 26.029], [91.592, 26.021]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "ASM-NM-03",
+        "name": "Nameri Foothill Corridor C2",
+        "division": "Sonitpur West Division",
+        "district": "Sonitpur",
+        "species": "Bonsum & Gamari (Phoebe goalparensis)",
+        "plantation_year": 2023,
+        "area_ha": 35.4,
+        "target_stems_per_ha": 1200,
+        "terrain": "Bhabar Foothill",
+        "base_ndvi": 0.56,
+        "survival_rate": 58.4,
+        "mean_dbh_cm": 6.3,
+        "mean_height_m": 3.7,
+        "status": "Alert: Low Survival"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[92.821, 26.921], [92.830, 26.921], [92.830, 26.927], [92.821, 26.927], [92.821, 26.921]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "ASM-DS-04",
+        "name": "Dibru-Saikhowa Riparian Restoration",
+        "division": "Tinsukia Wildlife Division",
+        "district": "Tinsukia",
+        "species": "Riparian Bamboo & Kadam",
+        "plantation_year": 2022,
+        "area_ha": 54.2,
+        "target_stems_per_ha": 1100,
+        "terrain": "Riverine Island",
+        "base_ndvi": 0.62,
+        "survival_rate": 63.1,
+        "mean_dbh_cm": 8.7,
+        "mean_height_m": 5.4,
+        "status": "Alert: Monsoon Stress"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[95.342, 27.641], [95.353, 27.641], [95.353, 27.648], [95.342, 27.648], [95.342, 27.641]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "ASM-OR-05",
+        "name": "Orang Fringe Agroforestry Belt",
+        "division": "Mangaldai Wildlife Division",
+        "district": "Darrang",
+        "species": "Terminalia & Bamboo Mix",
+        "plantation_year": 2020,
+        "area_ha": 71.8,
+        "target_stems_per_ha": 950,
+        "terrain": "Alluvial Plain",
+        "base_ndvi": 0.82,
+        "survival_rate": 91.0,
+        "mean_dbh_cm": 17.5,
+        "mean_height_m": 11.2,
+        "status": "Healthy"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[92.285, 26.551], [92.297, 26.551], [92.297, 26.560], [92.285, 26.560], [92.285, 26.551]]]
+      }
+    }
+  ]
+}
