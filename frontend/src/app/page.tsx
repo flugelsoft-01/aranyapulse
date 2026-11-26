@@ -15,6 +15,7 @@ import BiomassCharts from "@/components/BiomassCharts";
 import FieldVerifyModal from "@/components/FieldVerifyModal";
 import MrvReportModal from "@/components/MrvReportModal";
 import AdminConsole from "@/components/AdminConsole";
+import ProposalCopyPanel from "@/components/ProposalCopyPanel";
 import {
   Trees,
   Leaf,
@@ -27,6 +28,7 @@ import {
   RefreshCw,
   Settings,
   LayoutDashboard,
+  ClipboardCopy,
 } from "lucide-react";
 
 const API_BASE =
@@ -45,7 +47,7 @@ export default function HomePage() {
   const [mrvSummary, setMrvSummary] = useState<MrvSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "admin">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "admin" | "proposal">("dashboard");
   const [activeRole, setActiveRole] = useState<UserRole>("State Admin");
 
   const fetchAll = useCallback(async () => {
@@ -209,6 +211,18 @@ export default function HomePage() {
                 <Settings className="w-3.5 h-3.5" />
                 Admin Console
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("proposal")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer ${
+                  activeTab === "proposal"
+                    ? "bg-emerald-500 text-slate-950 font-bold"
+                    : "text-emerald-200/80 hover:text-emerald-50"
+                }`}
+              >
+                <ClipboardCopy className="w-3.5 h-3.5" />
+                Proposal Copy
+              </button>
             </div>
 
             <select
@@ -260,7 +274,9 @@ export default function HomePage() {
           </div>
         )}
 
-        {activeTab === "admin" ? (
+        {activeTab === "proposal" ? (
+          <ProposalCopyPanel />
+        ) : activeTab === "admin" ? (
           <AdminConsole
             apiBase={API_BASE}
             activeRole={activeRole}
